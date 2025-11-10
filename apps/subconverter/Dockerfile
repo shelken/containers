@@ -2,6 +2,8 @@
 # FROM asdlokj1qpi23/subconverter:0.9.8
 FROM asdlokj1qpi23/subconverter:0.9.3
 
+ENV VERSION 0.9.3
+
 WORKDIR /base
 RUN apk add tzdata --no-cache && \
   cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
@@ -13,7 +15,5 @@ COPY resource/pref.yml ./
 COPY resource/tmpl/clash.tpl base/
 
 EXPOSE 25500
-
-WORKDIR /base
 
 CMD ["subconverter"]
