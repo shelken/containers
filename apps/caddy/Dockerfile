@@ -8,11 +8,24 @@ RUN xcaddy build \
 # --with github.com/mholt/caddy-l4
 #    --with github.com/WeidiDeng/caddy-cloudflare-ip
 
-# support non root
-RUN setcap cap_net_bind_service=+eip /usr/bin/caddy
-
 # Final stage
 FROM caddy:${DOCKER_META_VERSION}
 
 # Copy the custom-built Caddy binary
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy
+
+# Install setcap utility
+RUN apk add --no-cache libcap
+
+# Set capabilities to allow binding to privileged ports as non-root user
+RUN setcap 'cap_net_bind_service=+ep' /usr/bin/caddy
+
+# Create non-root user
+RUN addgroup -g 1000 -S caddy && \
+  adduser -u 1000 -S caddy -G caddy
+
+# Change ownership of necessary directories
+RUN chown -R caddy:caddy /etc/caddy /config /data
+
+# Switch to non-root user
+USER caddy
