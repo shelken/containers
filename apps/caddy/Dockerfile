@@ -24,8 +24,9 @@ RUN setcap 'cap_net_bind_service=+ep' /usr/bin/caddy
 RUN addgroup -g 1000 -S caddy && \
   adduser -u 1000 -S caddy -G caddy
 
-# Change ownership of necessary directories
-RUN chown -R caddy:caddy /etc/caddy /config /data
+# Ensure directories have proper permissions for both users
+RUN chown -R caddy:caddy /etc/caddy /config /data /srv && \
+  chmod -R 755 /etc/caddy /config /data /srv
 
-# Switch to non-root user
-USER caddy
+# Keep default behavior (run as root) but allow non-root usage
+# Users can override by setting securityContext in Kubernetes
