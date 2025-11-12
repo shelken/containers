@@ -8,6 +8,9 @@ RUN xcaddy build \
 # --with github.com/mholt/caddy-l4
 #    --with github.com/WeidiDeng/caddy-cloudflare-ip
 
+# support non root
+RUN setcap cap_net_bind_service=+eip /usr/bin/caddy
+
 # Final stage
 FROM caddy:${DOCKER_META_VERSION}
 
