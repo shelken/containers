@@ -112,15 +112,10 @@ func formatMarkdown(notification Notification) string {
 			severityColor = "warning"
 		}
 
-		details := alert.Annotations["message"]
+		// 只显示 summary 字段（一句话摘要）
+		details := alert.Annotations["summary"]
 		if details == "" {
-			details = alert.Annotations["summary"]
-		}
-		if details == "" {
-			details = alert.Annotations["description"]
-		}
-		if details == "" {
-			details = "无详情"
+			details = "无摘要"
 		}
 
 		// 收集并排序 Labels 以提供上下文
