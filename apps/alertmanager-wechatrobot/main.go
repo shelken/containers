@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -104,7 +105,21 @@ func formatMarkdown(notification Notification) string {
 		statusStr = "<font color=\"info\">恢复</font>"
 	}
 
-	buffer.WriteString(fmt.Sprintf("### Alertmanager %s\n", statusStr))
+	// 改进标题：包含告警名称和级别
+	if len(notification.Alerts) > 0 {
+		alert := notification.Alerts[0]
+		alertName := alert.Labels["alertname"]
+		severity := alert.Labels["severity"]
+		
+		// 如果有多个告警，显示数量
+		if len(notification.Alerts) > 1 {
+			buffer.WriteString(fmt.Sprintf("### Alertmanager %s · %s · %s (%d个)\n", statusStr, alertName, severity, len(notification.Alerts)))
+		} else {
+			buffer.WriteString(fmt.Sprintf("### Alertmanager %s · %s · %s\n", statusStr, alertName, severity))
+		}
+	} else {
+		buffer.WriteString(fmt.Sprintf("### Alertmanager %s\n", statusStr))
+	}
 	for _, alert := range notification.Alerts {
 		severity := alert.Labels["severity"]
 		severityColor := "comment"
@@ -118,18 +133,36 @@ func formatMarkdown(notification Notification) string {
 			details = "无摘要"
 		}
 
-		// 收集并排序 Labels 以提供上下文
+		// 收集并排序 Labels 以提供上下文，排除无意义字段
 		var keys []string
+		excludeKeys := map[string]bool{
+			"alertname":          true,
+			"severity":           true,
+			"oci-digest":         true, // 排除哈希值
+			"revision":           true, // 排除版本哈希
+			"reportingcontroller": true, // 排除控制器名称
+		}
+		
 		for k := range alert.Labels {
-			if k != "alertname" && k != "severity" {
+			if !excludeKeys[k] {
+				// 排除看起来像哈希的值（以 sha256: 开头或长度超过40的十六进制）
+				value := alert.Labels[k]
+				if strings.HasPrefix(value, "sha256:") || 
+				   (len(value) > 40 && isHexString(value)) ||
+				   strings.Contains(value, "@sha") {
+					continue
+				}
 				keys = append(keys, k)
 			}
 		}
 		sort.Strings(keys)
 
 		var contextStr bytes.Buffer
-		for _, k := range keys {
-			contextStr.WriteString(fmt.Sprintf("%s=%s ", k, alert.Labels[k]))
+		for i, k := range keys {
+			if i > 0 {
+				contextStr.WriteString("\n")
+			}
+			contextStr.WriteString(fmt.Sprintf("%s=%s", k, alert.Labels[k]))
 		}
 
 		t := alert.StartsAt
@@ -149,6 +182,16 @@ func formatMarkdown(notification Notification) string {
 		buffer.WriteString("\n")
 	}
 	return buffer.String()
+}
+
+// isHexString 检查字符串是否只包含十六进制字符
+func isHexString(s string) bool {
+	for _, r := range s {
+		if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F')) {
+			return false
+		}
+	}
+	return true
 }
 
 func sendToWeChat(webhookURL, content string) error {
