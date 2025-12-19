@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sort"
 	"time"
 )
 
@@ -122,6 +123,20 @@ func formatMarkdown(notification Notification) string {
 			details = "无详情"
 		}
 
+		// 收集并排序 Labels 以提供上下文
+		var keys []string
+		for k := range alert.Labels {
+			if k != "alertname" && k != "severity" {
+				keys = append(keys, k)
+			}
+		}
+		sort.Strings(keys)
+
+		var contextStr bytes.Buffer
+		for _, k := range keys {
+			contextStr.WriteString(fmt.Sprintf("%s=%s ", k, alert.Labels[k]))
+		}
+
 		t := alert.StartsAt
 		timeLabel := "开始时间"
 		if alert.Status == "resolved" {
@@ -134,6 +149,7 @@ func formatMarkdown(notification Notification) string {
 		buffer.WriteString(fmt.Sprintf("> **告警名称**: <font color=\"info\">%s</font>\n", alert.Labels["alertname"]))
 		buffer.WriteString(fmt.Sprintf("> **告警级别**: <font color=\"%s\">%s</font>\n", severityColor, severity))
 		buffer.WriteString(fmt.Sprintf("> **告警详情**: %s\n", details))
+		buffer.WriteString(fmt.Sprintf("> **告警上下文**: %s\n", contextStr.String()))
 		buffer.WriteString(fmt.Sprintf("> **%s**: %s\n", timeLabel, timeStr))
 		buffer.WriteString("\n")
 	}
