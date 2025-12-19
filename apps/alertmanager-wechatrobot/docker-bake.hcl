@@ -8,12 +8,20 @@ variable "VERSION" {
   default = "0.1.0"
 }
 
+variable "GO_VERSION" {
+  // renovate: datasource=docker depName=golang
+  default = "1.23.4"
+}
+
 group "default" {
   targets = ["image-local"]
 }
 
 target "image" {
   inherits = ["docker-metadata-action"]
+  args = {
+    GO_VERSION = "${GO_VERSION}"
+  }
 }
 
 target "image-local" {

@@ -1,9 +1,10 @@
 # Build stage
-FROM golang:1.23-alpine AS builder
+ARG GO_VERSION
+
+FROM golang:${GO_VERSION}-alpine AS builder
 
 WORKDIR /app
 
-# Copy source and pre-generated go.mod
 COPY main.go go.mod ./
 
 RUN go build -o alertmanager-wechatrobot main.go
