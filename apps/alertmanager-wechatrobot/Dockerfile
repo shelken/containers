@@ -14,6 +14,9 @@ FROM alpine:latest
 
 WORKDIR /app
 
+# Install tzdata for timezone support
+RUN apk add --no-cache tzdata
+
 COPY --from=builder /app/alertmanager-wechatrobot .
 
 # Create non-root user
