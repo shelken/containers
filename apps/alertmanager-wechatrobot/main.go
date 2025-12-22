@@ -113,14 +113,14 @@ func formatMarkdown(notification Notification) string {
 
 		// 如果有多个告警，显示数量，标题保持原样（仅使用 alertname）
 		if len(notification.Alerts) > 1 {
-			buffer.WriteString(fmt.Sprintf("### Alertmanager %s · %s · %s (%d个)\n", statusStr, alertName, severity, len(notification.Alerts)))
+			fmt.Fprintf(&buffer, "### Alertmanager %s · %s · %s (%d个)\n", statusStr, alertName, severity, len(notification.Alerts))
 		} else {
 			// 如果仅有一个告警，尝试提取 name 或 pod 拼接到标题
-			displayName := getAlertDisplayName(alert)
-			buffer.WriteString(fmt.Sprintf("### Alertmanager %s · %s · %s\n", statusStr, displayName, severity))
+			displayName := getAlertDisplayName(alert, true)
+			fmt.Fprintf(&buffer, "### Alertmanager %s · %s · %s\n", statusStr, displayName, severity)
 		}
 	} else {
-		buffer.WriteString(fmt.Sprintf("### Alertmanager %s\n", statusStr))
+		fmt.Fprintf(&buffer, "### Alertmanager %s\n", statusStr)
 	}
 	for _, alert := range notification.Alerts {
 		severity := alert.Labels["severity"]
@@ -164,7 +164,7 @@ func formatMarkdown(notification Notification) string {
 			if i > 0 {
 				contextStr.WriteString("\n")
 			}
-			contextStr.WriteString(fmt.Sprintf("%s=%s", k, alert.Labels[k]))
+			fmt.Fprintf(&contextStr, "%s=%s", k, alert.Labels[k])
 		}
 
 		t := alert.StartsAt
@@ -176,12 +176,12 @@ func formatMarkdown(notification Notification) string {
 
 		timeStr := t.Local().Format("2006-01-02 15:04:05")
 
-		displayName := getAlertDisplayName(alert)
-		buffer.WriteString(fmt.Sprintf("> **告警名称**: <font color=\"info\">%s</font>\n", displayName))
-		buffer.WriteString(fmt.Sprintf("> **告警级别**: <font color=\"%s\">%s</font>\n", severityColor, severity))
-		buffer.WriteString(fmt.Sprintf("> **告警详情**: %s\n", details))
-		buffer.WriteString(fmt.Sprintf("> **告警上下文**: %s\n", contextStr.String()))
-		buffer.WriteString(fmt.Sprintf("> **%s**: %s\n", timeLabel, timeStr))
+		displayName := getAlertDisplayName(alert, false)
+		fmt.Fprintf(&buffer, "> **告警名称**: <font color=\"info\">%s</font>\n", displayName)
+		fmt.Fprintf(&buffer, "> **告警级别**: <font color=\"%s\">%s</font>\n", severityColor, severity)
+		fmt.Fprintf(&buffer, "> **告警详情**: %s\n", details)
+		fmt.Fprintf(&buffer, "> **告警上下文**: %s\n", contextStr.String())
+		fmt.Fprintf(&buffer, "> **%s**: %s\n", timeLabel, timeStr)
 		buffer.WriteString("\n")
 	}
 	return buffer.String()
@@ -189,24 +189,30 @@ func formatMarkdown(notification Notification) string {
 
 // getAlertDisplayName 根据 label 生成告警显示名称
 // 逻辑：
-// 1. 如果有 name label，返回 alertname - name
-// 2. 如果没有 name 但有 pod label，处理 pod 名称（按 - 分割剔除倒数后两个），返回 alertname - processed_pod
+// 1. 如果有 name label，返回 alertname - name (当includeAlertName=true) 或 name (当includeAlertName=false)
+// 2. 如果没有 name 但有 pod label，处理 pod 名称（按 - 分割剔除倒数后两个），返回 alertname - processed_pod 或 processed_pod
 // 3. 否则只返回 alertname
-func getAlertDisplayName(alert Alert) string {
+func getAlertDisplayName(alert Alert, includeAlertName bool) string {
 	alertName := alert.Labels["alertname"]
-	if name, ok := alert.Labels["name"]; ok && name != "" {
-		return fmt.Sprintf("%s", name)
-	}
+	var resourceName string
 
-	if pod, ok := alert.Labels["pod"]; ok && pod != "" {
+	if name, ok := alert.Labels["name"]; ok && name != "" {
+		resourceName = name
+	} else if pod, ok := alert.Labels["pod"]; ok && pod != "" {
 		parts := strings.Split(pod, "-")
 		// 如果 pod 名称分割后超过 2 部分，剔除倒数后两个（通常是 replica set hash 和 pod hash）
 		if len(parts) > 2 {
-			podName := strings.Join(parts[:len(parts)-2], "-")
-			return fmt.Sprintf("%s", podName)
+			resourceName = strings.Join(parts[:len(parts)-2], "-")
+		} else {
+			resourceName = pod
 		}
-		// 如果部分不足，直接使用 pod 原名
-		return fmt.Sprintf("%s", pod)
+	}
+
+	if resourceName != "" {
+		if includeAlertName {
+			return fmt.Sprintf("%s - %s", alertName, resourceName)
+		}
+		return resourceName
 	}
 
 	return alertName
