@@ -110,12 +110,14 @@ func formatMarkdown(notification Notification) string {
 		alert := notification.Alerts[0]
 		alertName := alert.Labels["alertname"]
 		severity := alert.Labels["severity"]
-		
-		// 如果有多个告警，显示数量
+
+		// 如果有多个告警，显示数量，标题保持原样（仅使用 alertname）
 		if len(notification.Alerts) > 1 {
 			buffer.WriteString(fmt.Sprintf("### Alertmanager %s · %s · %s (%d个)\n", statusStr, alertName, severity, len(notification.Alerts)))
 		} else {
-			buffer.WriteString(fmt.Sprintf("### Alertmanager %s · %s · %s\n", statusStr, alertName, severity))
+			// 如果仅有一个告警，尝试提取 name 或 pod 拼接到标题
+			displayName := getAlertDisplayName(alert)
+			buffer.WriteString(fmt.Sprintf("### Alertmanager %s · %s · %s\n", statusStr, displayName, severity))
 		}
 	} else {
 		buffer.WriteString(fmt.Sprintf("### Alertmanager %s\n", statusStr))
@@ -136,20 +138,20 @@ func formatMarkdown(notification Notification) string {
 		// 收集并排序 Labels 以提供上下文，排除无意义字段
 		var keys []string
 		excludeKeys := map[string]bool{
-			"alertname":          true,
-			"severity":           true,
-			"oci-digest":         true, // 排除哈希值
-			"revision":           true, // 排除版本哈希
+			"alertname":           true,
+			"severity":            true,
+			"oci-digest":          true, // 排除哈希值
+			"revision":            true, // 排除版本哈希
 			"reportingcontroller": true, // 排除控制器名称
 		}
-		
+
 		for k := range alert.Labels {
 			if !excludeKeys[k] {
 				// 排除看起来像哈希的值（以 sha256: 开头或长度超过40的十六进制）
 				value := alert.Labels[k]
-				if strings.HasPrefix(value, "sha256:") || 
-				   (len(value) > 40 && isHexString(value)) ||
-				   strings.Contains(value, "@sha") {
+				if strings.HasPrefix(value, "sha256:") ||
+					(len(value) > 40 && isHexString(value)) ||
+					strings.Contains(value, "@sha") {
 					continue
 				}
 				keys = append(keys, k)
@@ -174,7 +176,8 @@ func formatMarkdown(notification Notification) string {
 
 		timeStr := t.Local().Format("2006-01-02 15:04:05")
 
-		buffer.WriteString(fmt.Sprintf("> **告警名称**: <font color=\"info\">%s</font>\n", alert.Labels["alertname"]))
+		displayName := getAlertDisplayName(alert)
+		buffer.WriteString(fmt.Sprintf("> **告警名称**: <font color=\"info\">%s</font>\n", displayName))
 		buffer.WriteString(fmt.Sprintf("> **告警级别**: <font color=\"%s\">%s</font>\n", severityColor, severity))
 		buffer.WriteString(fmt.Sprintf("> **告警详情**: %s\n", details))
 		buffer.WriteString(fmt.Sprintf("> **告警上下文**: %s\n", contextStr.String()))
@@ -182,6 +185,31 @@ func formatMarkdown(notification Notification) string {
 		buffer.WriteString("\n")
 	}
 	return buffer.String()
+}
+
+// getAlertDisplayName 根据 label 生成告警显示名称
+// 逻辑：
+// 1. 如果有 name label，返回 alertname - name
+// 2. 如果没有 name 但有 pod label，处理 pod 名称（按 - 分割剔除倒数后两个），返回 alertname - processed_pod
+// 3. 否则只返回 alertname
+func getAlertDisplayName(alert Alert) string {
+	alertName := alert.Labels["alertname"]
+	if name, ok := alert.Labels["name"]; ok && name != "" {
+		return fmt.Sprintf("%s", name)
+	}
+
+	if pod, ok := alert.Labels["pod"]; ok && pod != "" {
+		parts := strings.Split(pod, "-")
+		// 如果 pod 名称分割后超过 2 部分，剔除倒数后两个（通常是 replica set hash 和 pod hash）
+		if len(parts) > 2 {
+			podName := strings.Join(parts[:len(parts)-2], "-")
+			return fmt.Sprintf("%s", podName)
+		}
+		// 如果部分不足，直接使用 pod 原名
+		return fmt.Sprintf("%s", pod)
+	}
+
+	return alertName
 }
 
 // isHexString 检查字符串是否只包含十六进制字符
