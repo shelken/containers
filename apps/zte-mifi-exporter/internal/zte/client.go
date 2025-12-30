@@ -106,23 +106,26 @@ func (c *Client) GetDeviceData() *DeviceData {
 
 // fetchDeviceData 从 ZTE 设备获取数据
 func (c *Client) fetchDeviceData() *DeviceData {
-	// 检查是否需要登录
-	if time.Now().After(c.loginExpiry) {
-		if err := c.login(); err != nil {
-			log.Printf("Login failed: %v", err)
-			return &DeviceData{Success: false}
-		}
-		// 登录成功，设置过期时间 (5分钟)
-		c.loginExpiry = time.Now().Add(5 * time.Minute)
-	}
-
 	// 获取设备数据
 	data, err := c.getDeviceStatus()
 	if err != nil {
 		log.Printf("Failed to get device data: %v", err)
-		// 可能是会话过期，清除登录状态
-		c.loginExpiry = time.Time{}
-		return &DeviceData{Success: false}
+		// 获取数据失败，尝试重新登录
+		log.Println("Attempting to re-login due to fetch failure...")
+		if err := c.login(); err != nil {
+			log.Printf("Re-login failed: %v", err)
+			return &DeviceData{Success: false}
+		}
+		// 重新登录成功，更新登录过期时间
+		c.loginExpiry = time.Now().Add(5 * time.Minute)
+
+		// 再次尝试获取设备数据
+		data, err := c.getDeviceStatus()
+		if err != nil {
+			log.Printf("Failed to get device data after re-login: %v", err)
+			return &DeviceData{Success: false}
+		}
+		return data
 	}
 
 	return data
@@ -294,6 +297,14 @@ func (c *Client) getDeviceStatus() (*DeviceData, error) {
 	// WiFi 状态
 	data.WifiStaNum = int(parseIntFromJSON(result["wifi_access_sta_num"]))
 	data.WifiOnOff = parseStringFromJSON(result["wifi_onoff_state"]) == "1"
+
+	// 检查关键字段是否存在
+	if data.NetworkType == "" {
+		return nil, fmt.Errorf("critical field 'network_type' is missing or empty")
+	}
+	if data.Provider == "" {
+		return nil, fmt.Errorf("critical field 'provider' is missing or empty")
+	}
 
 	log.Printf("Device data: TX=%d, RX=%d, Signal=%d, Network=%s, Provider=%s",
 		data.MonthlyTxBytes, data.MonthlyRxBytes, data.SignalBar, data.NetworkType, data.Provider)
