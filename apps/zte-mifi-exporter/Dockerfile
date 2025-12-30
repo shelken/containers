@@ -5,9 +5,11 @@ FROM golang:${GO_VERSION}-alpine AS builder
 
 WORKDIR /app
 
-COPY main.go go.mod ./
+COPY go.mod ./
+COPY main.go ./
+COPY internal/ ./internal/
 
-RUN go build -o zte-mifi-exporter main.go
+RUN go build -o zte-mifi-exporter .
 
 # Final stage
 FROM alpine:latest
