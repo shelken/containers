@@ -14,6 +14,39 @@ import (
 	"time"
 )
 
+// Constants for ZTE API
+const (
+	// Login constants
+	DefaultUsername = "admin"
+	LoginSuccess    = "0"
+
+	// Time durations
+	CacheTTL    = 30 * time.Second
+	LoginExpiry = 5 * time.Minute
+
+	// API endpoints and paths
+	BaseAPIPath      = "/goform/goform_get_cmd_process"
+	SetCmdPath       = "/goform/goform_set_cmd_process"
+	IndexHTMLPath    = "/index.html"
+	LDTimestampParam = "LD"
+
+	// HTTP headers
+	ContentTypeFormURLEncoded = "application/x-www-form-urlencoded; charset=UTF-8"
+	XRequestedWith            = "XMLHttpRequest"
+	AcceptHeader              = "application/json, text/javascript, */*; q=0.01"
+	AcceptLanguageHeader      = "zh-CN,zh;q=0.9"
+
+	// API parameter values
+	IsTestFalse   = "false"
+	GoFormIDLogin = "LOGIN"
+
+	// Critical fields for validation
+	NetworkTypeField = "network_type"
+	ProviderField    = "network_provider"
+	ErrorField       = "Error"
+	ResultField      = "result"
+)
+
 // Config 客户端配置
 type Config struct {
 	Host       string
@@ -75,7 +108,7 @@ type ZTEResponse map[string]interface{}
 func NewClient(config Config) *Client {
 	return &Client{
 		config:   config,
-		cacheTTL: 30 * time.Second,
+		cacheTTL: CacheTTL,
 	}
 }
 
@@ -117,7 +150,7 @@ func (c *Client) fetchDeviceData() *DeviceData {
 			return &DeviceData{Success: false}
 		}
 		// 重新登录成功，更新登录过期时间
-		c.loginExpiry = time.Now().Add(5 * time.Minute)
+		c.loginExpiry = time.Now().Add(LoginExpiry)
 
 		// 再次尝试获取设备数据
 		data, err := c.getDeviceStatus()
@@ -135,7 +168,7 @@ func (c *Client) fetchDeviceData() *DeviceData {
 func (c *Client) getLD() (string, error) {
 	baseURL := fmt.Sprintf("http://%s", c.config.Host)
 	timestamp := time.Now().UnixMilli()
-	reqURL := fmt.Sprintf("%s/goform/goform_get_cmd_process?isTest=false&cmd=LD&_=%d", baseURL, timestamp)
+	reqURL := fmt.Sprintf("%s%s?isTest=%s&cmd=%s&_=%d", baseURL, BaseAPIPath, IsTestFalse, LDTimestampParam, timestamp)
 
 	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {
@@ -159,9 +192,9 @@ func (c *Client) getLD() (string, error) {
 		return "", fmt.Errorf("failed to parse LD response: %w", err)
 	}
 
-	ld, ok := result["LD"].(string)
+	ld, ok := result[LDTimestampParam].(string)
 	if !ok || ld == "" {
-		return "", fmt.Errorf("LD not found in response")
+		return "", fmt.Errorf("%s not found in response", LDTimestampParam)
 	}
 
 	return ld, nil
@@ -174,18 +207,18 @@ func (c *Client) login() error {
 	// 1. 获取 LD token
 	ld, err := c.getLD()
 	if err != nil {
-		return fmt.Errorf("failed to get LD: %w", err)
+		return fmt.Errorf("failed to get %s: %w", LDTimestampParam, err)
 	}
 
 	// 2. 计算加密密码: sha256(sha256(password) + LD)
 	encryptedPassword := encryptPasswordWithLD(c.config.Password, ld)
 
 	// 3. 发送登录请求
-	loginURL := fmt.Sprintf("%s/goform/goform_set_cmd_process", baseURL)
+	loginURL := fmt.Sprintf("%s%s", baseURL, SetCmdPath)
 	formData := url.Values{}
-	formData.Set("isTest", "false")
-	formData.Set("goformId", "LOGIN")
-	formData.Set("user", "admin")
+	formData.Set("isTest", IsTestFalse)
+	formData.Set("goformId", GoFormIDLogin)
+	formData.Set("user", DefaultUsername)
 	formData.Set("password", encryptedPassword)
 
 	req, err := http.NewRequest("POST", loginURL, strings.NewReader(formData.Encode()))
@@ -193,7 +226,7 @@ func (c *Client) login() error {
 		return err
 	}
 	c.setCommonHeaders(req, baseURL)
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+	req.Header.Set("Content-Type", ContentTypeFormURLEncoded)
 	req.Header.Set("Origin", baseURL)
 
 	resp, err := c.config.HTTPClient.Do(req)
@@ -213,8 +246,8 @@ func (c *Client) login() error {
 	}
 
 	// 检查登录结果: result=0 表示成功, result=3 表示已登录或失败
-	resultVal := fmt.Sprintf("%v", result["result"])
-	if resultVal != "0" {
+	resultVal := fmt.Sprintf("%v", result[ResultField])
+	if resultVal != LoginSuccess {
 		return fmt.Errorf("login failed: result=%s", resultVal)
 	}
 
@@ -236,7 +269,7 @@ func (c *Client) getDeviceStatus() (*DeviceData, error) {
 		"ppp_status,signalbar,wifi_onoff_state,date_month"
 
 	timestamp := time.Now().UnixMilli()
-	reqURL := fmt.Sprintf("%s/goform/goform_get_cmd_process?isTest=false&cmd=%s&multi_data=1&_=%d", baseURL, cmd, timestamp)
+	reqURL := fmt.Sprintf("%s%s?isTest=%s&cmd=%s&multi_data=1&_=%d", baseURL, BaseAPIPath, IsTestFalse, cmd, timestamp)
 
 	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {
@@ -261,7 +294,7 @@ func (c *Client) getDeviceStatus() (*DeviceData, error) {
 	}
 
 	// 检查是否有错误
-	if errMsg, ok := result["Error"].(string); ok && errMsg != "" {
+	if errMsg, ok := result[ErrorField].(string); ok && errMsg != "" {
 		return nil, fmt.Errorf("API error: %s", errMsg)
 	}
 
@@ -300,10 +333,10 @@ func (c *Client) getDeviceStatus() (*DeviceData, error) {
 
 	// 检查关键字段是否存在
 	if data.NetworkType == "" {
-		return nil, fmt.Errorf("critical field 'network_type' is missing or empty")
+		return nil, fmt.Errorf("critical field '%s' is missing or empty", NetworkTypeField)
 	}
 	if data.Provider == "" {
-		return nil, fmt.Errorf("critical field 'provider' is missing or empty")
+		return nil, fmt.Errorf("critical field '%s' is missing or empty", ProviderField)
 	}
 
 	log.Printf("Device data: TX=%d, RX=%d, Signal=%d, Network=%s, Provider=%s",
@@ -313,11 +346,11 @@ func (c *Client) getDeviceStatus() (*DeviceData, error) {
 
 // setCommonHeaders 设置通用请求头
 func (c *Client) setCommonHeaders(req *http.Request, baseURL string) {
-	req.Header.Set("Accept", "application/json, text/javascript, */*; q=0.01")
-	req.Header.Set("Accept-Language", "zh-CN,zh;q=0.9")
+	req.Header.Set("Accept", AcceptHeader)
+	req.Header.Set("Accept-Language", AcceptLanguageHeader)
 	req.Header.Set("User-Agent", c.config.UserAgent)
-	req.Header.Set("X-Requested-With", "XMLHttpRequest")
-	req.Header.Set("Referer", fmt.Sprintf("%s/index.html", baseURL))
+	req.Header.Set("X-Requested-With", XRequestedWith)
+	req.Header.Set("Referer", fmt.Sprintf("%s%s", baseURL, IndexHTMLPath))
 }
 
 // encryptPasswordWithLD 使用双重 SHA256 加密密码: sha256(sha256(password) + LD)
