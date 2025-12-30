@@ -34,6 +34,11 @@ func (h *Handlers) MetricsHandler(w http.ResponseWriter, r *http.Request) {
 	// 通用 labels
 	labels := fmt.Sprintf(`host="%s",network_type="%s",provider="%s"`, h.host, data.NetworkType, data.Provider)
 
+	// === 设备信息 ===
+	fmt.Fprintf(w, "# HELP zte_mifi_info Device information\n")
+	fmt.Fprintf(w, "# TYPE zte_mifi_info gauge\n")
+	fmt.Fprintf(w, "zte_mifi_info{host=\"%s\",firmware=\"%s\"} 1\n", h.host, data.FirmwareVersion)
+
 	// === 流量统计 ===
 	// 月度发送字节数
 	fmt.Fprintf(w, "# HELP zte_mifi_monthly_tx_bytes_total Monthly transmitted bytes\n")
@@ -55,13 +60,24 @@ func (h *Handlers) MetricsHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "# TYPE zte_mifi_monthly_time_seconds gauge\n")
 	fmt.Fprintf(w, "zte_mifi_monthly_time_seconds{%s} %d\n", labels, data.MonthlyTime)
 
+	// === 实时速率 ===
+	// 实时上传速率
+	fmt.Fprintf(w, "# HELP zte_mifi_realtime_tx_bytes_per_second Realtime upload speed in bytes/s\n")
+	fmt.Fprintf(w, "# TYPE zte_mifi_realtime_tx_bytes_per_second gauge\n")
+	fmt.Fprintf(w, "zte_mifi_realtime_tx_bytes_per_second{%s} %d\n", labels, data.RealtimeTxThrpt)
+
+	// 实时下载速率
+	fmt.Fprintf(w, "# HELP zte_mifi_realtime_rx_bytes_per_second Realtime download speed in bytes/s\n")
+	fmt.Fprintf(w, "# TYPE zte_mifi_realtime_rx_bytes_per_second gauge\n")
+	fmt.Fprintf(w, "zte_mifi_realtime_rx_bytes_per_second{%s} %d\n", labels, data.RealtimeRxThrpt)
+
 	// === 信号状态 ===
 	// 信号格数
 	fmt.Fprintf(w, "# HELP zte_mifi_signal_bar Signal bar level (0-5)\n")
 	fmt.Fprintf(w, "# TYPE zte_mifi_signal_bar gauge\n")
 	fmt.Fprintf(w, "zte_mifi_signal_bar{%s} %d\n", labels, data.SignalBar)
 
-	// 5G RSRP
+	// 5G RSRP (Z5g_rsrp)
 	fmt.Fprintf(w, "# HELP zte_mifi_rsrp_5g_dbm 5G RSRP signal strength in dBm\n")
 	fmt.Fprintf(w, "# TYPE zte_mifi_rsrp_5g_dbm gauge\n")
 	fmt.Fprintf(w, "zte_mifi_rsrp_5g_dbm{%s} %d\n", labels, data.RSRP5G)
@@ -70,6 +86,22 @@ func (h *Handlers) MetricsHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "# HELP zte_mifi_rssi RSSI signal level\n")
 	fmt.Fprintf(w, "# TYPE zte_mifi_rssi gauge\n")
 	fmt.Fprintf(w, "zte_mifi_rssi{%s} %d\n", labels, data.RSSI)
+
+	// === 5G NR 详细信号 ===
+	// NR RSRP
+	fmt.Fprintf(w, "# HELP zte_mifi_nr_rsrp_dbm NR RSRP signal strength in dBm\n")
+	fmt.Fprintf(w, "# TYPE zte_mifi_nr_rsrp_dbm gauge\n")
+	fmt.Fprintf(w, "zte_mifi_nr_rsrp_dbm{%s,nr_band=\"%d\"} %d\n", labels, data.NrBands, data.NrRSRP)
+
+	// NR RSRQ
+	fmt.Fprintf(w, "# HELP zte_mifi_nr_rsrq_db NR RSRQ in dB\n")
+	fmt.Fprintf(w, "# TYPE zte_mifi_nr_rsrq_db gauge\n")
+	fmt.Fprintf(w, "zte_mifi_nr_rsrq_db{%s,nr_band=\"%d\"} %d\n", labels, data.NrBands, data.NrRSRQ)
+
+	// NR SNR
+	fmt.Fprintf(w, "# HELP zte_mifi_nr_snr_db NR SNR (Signal-to-Noise Ratio) in dB\n")
+	fmt.Fprintf(w, "# TYPE zte_mifi_nr_snr_db gauge\n")
+	fmt.Fprintf(w, "zte_mifi_nr_snr_db{%s,nr_band=\"%d\"} %d\n", labels, data.NrBands, data.NrSNR)
 
 	// PPP 连接状态
 	fmt.Fprintf(w, "# HELP zte_mifi_ppp_connected PPP connection status (1=connected, 0=disconnected)\n")

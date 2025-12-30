@@ -24,23 +24,36 @@ type Config struct {
 
 // DeviceData 设备数据
 type DeviceData struct {
+	// 设备信息
+	FirmwareVersion string // 固件版本
+
 	// 流量统计
 	MonthlyTxBytes int64
 	MonthlyRxBytes int64
 	MonthlyTime    int64 // 月在线时长(秒)
 	DateMonth      int
 
+	// 实时速率
+	RealtimeTxThrpt int64 // 实时上传速率 (bytes/s)
+	RealtimeRxThrpt int64 // 实时下载速率 (bytes/s)
+
 	// 信号状态
-	SignalBar    int    // 信号格数 (0-5)
-	NetworkType  string // 网络类型 (5G/LTE等)
-	Provider     string // 运营商
-	PPPStatus    string // 连接状态
-	RSRP5G       int    // 5G RSRP (dBm)
-	RSSI         int    // RSSI 信号
+	SignalBar   int    // 信号格数 (0-5)
+	NetworkType string // 网络类型 (5G/LTE等)
+	Provider    string // 运营商
+	PPPStatus   string // 连接状态
+	RSRP5G      int    // 5G RSRP (dBm)
+	RSSI        int    // RSSI 信号
+
+	// 5G NR 详细信号
+	NrSNR   int // 5G SNR 信噪比
+	NrRSRP  int // NR RSRP (dBm)
+	NrRSRQ  int // NR RSRQ (dB)
+	NrBands int // 5G 频段
 
 	// WiFi 状态
-	WifiStaNum   int  // WiFi 连接设备数
-	WifiOnOff    bool // WiFi 开关状态
+	WifiStaNum int  // WiFi 连接设备数
+	WifiOnOff  bool // WiFi 开关状态
 
 	Success bool
 }
@@ -210,10 +223,14 @@ func (c *Client) login() error {
 func (c *Client) getDeviceStatus() (*DeviceData, error) {
 	baseURL := fmt.Sprintf("http://%s", c.config.Host)
 
-	// 合并所有需要的字段
-	cmd := "monthly_tx_bytes,monthly_rx_bytes,monthly_time,date_month," +
-		"signalbar,network_type,network_provider,ppp_status,Z5g_rsrp,rssi," +
-		"wifi_access_sta_num,wifi_onoff_state"
+	// 使用完整的查询列表以确保所有字段都能返回 (某些字段需要作为一组查询才会返回)
+	cmd := "usb_port_switch,battery_charging,sms_received_flag,sms_unread_num,sms_sim_unread_num," +
+		"sim_msisdn,data_volume_limit_switch,battery_value,battery_vol_percent,network_signalbar," +
+		"network_rssi,cr_version,iccid,imei,imsi,ipv6_wan_ipaddr,lan_ipaddr,mac_address,msisdn," +
+		"network_information,Lte_ca_status,rssi,Z5g_rsrp,lte_rsrp,wifi_access_sta_num,loginfo," +
+		"data_volume_alert_percent,data_volume_limit_size,realtime_rx_thrpt,realtime_tx_thrpt," +
+		"realtime_time,monthly_tx_bytes,monthly_rx_bytes,monthly_time,network_type,network_provider," +
+		"ppp_status,signalbar,wifi_onoff_state,date_month"
 
 	timestamp := time.Now().UnixMilli()
 	reqURL := fmt.Sprintf("%s/goform/goform_get_cmd_process?isTest=false&cmd=%s&multi_data=1&_=%d", baseURL, cmd, timestamp)
@@ -247,11 +264,18 @@ func (c *Client) getDeviceStatus() (*DeviceData, error) {
 
 	data := &DeviceData{Success: true}
 
+	// 设备信息
+	data.FirmwareVersion = parseStringFromJSON(result["cr_version"])
+
 	// 流量统计
 	data.MonthlyTxBytes = parseIntFromJSON(result["monthly_tx_bytes"])
 	data.MonthlyRxBytes = parseIntFromJSON(result["monthly_rx_bytes"])
 	data.MonthlyTime = parseIntFromJSON(result["monthly_time"])
 	data.DateMonth = int(parseIntFromJSON(result["date_month"]))
+
+	// 实时速率
+	data.RealtimeTxThrpt = parseIntFromJSON(result["realtime_tx_thrpt"])
+	data.RealtimeRxThrpt = parseIntFromJSON(result["realtime_rx_thrpt"])
 
 	// 信号状态
 	data.SignalBar = int(parseIntFromJSON(result["signalbar"]))
@@ -260,6 +284,12 @@ func (c *Client) getDeviceStatus() (*DeviceData, error) {
 	data.PPPStatus = parseStringFromJSON(result["ppp_status"])
 	data.RSRP5G = int(parseIntFromJSON(result["Z5g_rsrp"]))
 	data.RSSI = int(parseIntFromJSON(result["rssi"]))
+
+	// 5G 详细信号
+	data.NrSNR = int(parseIntFromJSON(result["Nr_snr"]))
+	data.NrRSRP = int(parseIntFromJSON(result["nr_rsrp"]))
+	data.NrRSRQ = int(parseIntFromJSON(result["nr_rsrq"]))
+	data.NrBands = int(parseIntFromJSON(result["Nr_bands"]))
 
 	// WiFi 状态
 	data.WifiStaNum = int(parseIntFromJSON(result["wifi_access_sta_num"]))
