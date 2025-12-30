@@ -22,19 +22,34 @@ type Config struct {
 	HTTPClient *http.Client
 }
 
-// TrafficData 流量数据
-type TrafficData struct {
+// DeviceData 设备数据
+type DeviceData struct {
+	// 流量统计
 	MonthlyTxBytes int64
 	MonthlyRxBytes int64
+	MonthlyTime    int64 // 月在线时长(秒)
 	DateMonth      int
-	Success        bool
+
+	// 信号状态
+	SignalBar    int    // 信号格数 (0-5)
+	NetworkType  string // 网络类型 (5G/LTE等)
+	Provider     string // 运营商
+	PPPStatus    string // 连接状态
+	RSRP5G       int    // 5G RSRP (dBm)
+	RSSI         int    // RSSI 信号
+
+	// WiFi 状态
+	WifiStaNum   int  // WiFi 连接设备数
+	WifiOnOff    bool // WiFi 开关状态
+
+	Success bool
 }
 
 // Client ZTE 设备客户端
 type Client struct {
 	config      Config
 	cacheMu     sync.RWMutex
-	cacheData   *TrafficData
+	cacheData   *DeviceData
 	cacheTime   time.Time
 	cacheTTL    time.Duration
 	loginExpiry time.Time
@@ -51,8 +66,8 @@ func NewClient(config Config) *Client {
 	}
 }
 
-// GetTrafficData 获取流量数据（带缓存）
-func (c *Client) GetTrafficData() *TrafficData {
+// GetDeviceData 获取设备数据（带缓存）
+func (c *Client) GetDeviceData() *DeviceData {
 	c.cacheMu.RLock()
 	if c.cacheData != nil && time.Since(c.cacheTime) < c.cacheTTL {
 		data := c.cacheData
@@ -70,31 +85,31 @@ func (c *Client) GetTrafficData() *TrafficData {
 		return c.cacheData
 	}
 
-	data := c.fetchTrafficData()
+	data := c.fetchDeviceData()
 	c.cacheData = data
 	c.cacheTime = time.Now()
 	return data
 }
 
-// fetchTrafficData 从 ZTE 设备获取流量数据
-func (c *Client) fetchTrafficData() *TrafficData {
+// fetchDeviceData 从 ZTE 设备获取数据
+func (c *Client) fetchDeviceData() *DeviceData {
 	// 检查是否需要登录
 	if time.Now().After(c.loginExpiry) {
 		if err := c.login(); err != nil {
 			log.Printf("Login failed: %v", err)
-			return &TrafficData{Success: false}
+			return &DeviceData{Success: false}
 		}
 		// 登录成功，设置过期时间 (5分钟)
 		c.loginExpiry = time.Now().Add(5 * time.Minute)
 	}
 
-	// 获取流量数据
-	data, err := c.getMonthlyTraffic()
+	// 获取设备数据
+	data, err := c.getDeviceStatus()
 	if err != nil {
-		log.Printf("Failed to get traffic data: %v", err)
+		log.Printf("Failed to get device data: %v", err)
 		// 可能是会话过期，清除登录状态
 		c.loginExpiry = time.Time{}
-		return &TrafficData{Success: false}
+		return &DeviceData{Success: false}
 	}
 
 	return data
@@ -191,13 +206,17 @@ func (c *Client) login() error {
 	return nil
 }
 
-// getMonthlyTraffic 获取月度流量数据
-func (c *Client) getMonthlyTraffic() (*TrafficData, error) {
+// getDeviceStatus 获取设备状态数据
+func (c *Client) getDeviceStatus() (*DeviceData, error) {
 	baseURL := fmt.Sprintf("http://%s", c.config.Host)
 
-	// GET 请求不需要 AD 参数，添加时间戳防止缓存
+	// 合并所有需要的字段
+	cmd := "monthly_tx_bytes,monthly_rx_bytes,monthly_time,date_month," +
+		"signalbar,network_type,network_provider,ppp_status,Z5g_rsrp,rssi," +
+		"wifi_access_sta_num,wifi_onoff_state"
+
 	timestamp := time.Now().UnixMilli()
-	reqURL := fmt.Sprintf("%s/goform/goform_get_cmd_process?isTest=false&cmd=monthly_tx_bytes,monthly_rx_bytes,date_month&multi_data=1&_=%d", baseURL, timestamp)
+	reqURL := fmt.Sprintf("%s/goform/goform_get_cmd_process?isTest=false&cmd=%s&multi_data=1&_=%d", baseURL, cmd, timestamp)
 
 	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {
@@ -226,14 +245,28 @@ func (c *Client) getMonthlyTraffic() (*TrafficData, error) {
 		return nil, fmt.Errorf("API error: %s", errMsg)
 	}
 
-	data := &TrafficData{Success: true}
+	data := &DeviceData{Success: true}
 
-	// 解析数据 (API 返回数字类型，不是字符串)
+	// 流量统计
 	data.MonthlyTxBytes = parseIntFromJSON(result["monthly_tx_bytes"])
 	data.MonthlyRxBytes = parseIntFromJSON(result["monthly_rx_bytes"])
+	data.MonthlyTime = parseIntFromJSON(result["monthly_time"])
 	data.DateMonth = int(parseIntFromJSON(result["date_month"]))
 
-	log.Printf("Traffic data: TX=%d, RX=%d, Month=%d", data.MonthlyTxBytes, data.MonthlyRxBytes, data.DateMonth)
+	// 信号状态
+	data.SignalBar = int(parseIntFromJSON(result["signalbar"]))
+	data.NetworkType = parseStringFromJSON(result["network_type"])
+	data.Provider = parseStringFromJSON(result["network_provider"])
+	data.PPPStatus = parseStringFromJSON(result["ppp_status"])
+	data.RSRP5G = int(parseIntFromJSON(result["Z5g_rsrp"]))
+	data.RSSI = int(parseIntFromJSON(result["rssi"]))
+
+	// WiFi 状态
+	data.WifiStaNum = int(parseIntFromJSON(result["wifi_access_sta_num"]))
+	data.WifiOnOff = parseStringFromJSON(result["wifi_onoff_state"]) == "1"
+
+	log.Printf("Device data: TX=%d, RX=%d, Signal=%d, Network=%s, Provider=%s",
+		data.MonthlyTxBytes, data.MonthlyRxBytes, data.SignalBar, data.NetworkType, data.Provider)
 	return data, nil
 }
 
@@ -271,4 +304,15 @@ func parseIntFromJSON(v interface{}) int64 {
 	default:
 		return 0
 	}
+}
+
+// parseStringFromJSON 从 JSON 值中解析字符串
+func parseStringFromJSON(v interface{}) string {
+	if v == nil {
+		return ""
+	}
+	if s, ok := v.(string); ok {
+		return s
+	}
+	return fmt.Sprintf("%v", v)
 }
