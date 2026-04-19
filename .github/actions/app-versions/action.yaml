@@ -57,9 +57,9 @@ runs:
         script: |-
           const semver = require('semver');
 
-          // Strip the v prefix and pre-release info
+          // 仅去掉 v 前缀，保留预发布后缀用于镜像原始标签
           function sanitize(version) {
-              return version.replace(/^v/, '').split('-')[0];
+              return version.replace(/^v/, '');
           }
 
           function calver() {
