@@ -4,11 +4,12 @@ WORKDIR /src
 
 RUN apk add --no-cache git
 
-RUN git clone --depth=1 --branch feat/fill-first-codex-warmup https://github.com/shelken/CLIProxyAPI.git .
-
 ARG VERSION=dev
+ARG SOURCE_REPO=https://github.com/shelken/CLIProxyAPI.git
 ARG COMMIT=none
 ARG BUILD_DATE=unknown
+
+RUN git clone --depth=1 --branch "${VERSION}" "${SOURCE_REPO}" .
 
 RUN go mod download
 

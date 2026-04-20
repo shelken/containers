@@ -5,7 +5,8 @@ variable "APP" {
 }
 
 variable "VERSION" {
-  default = "6.9.28-fillfirst.1"
+  // renovate: datasource=github-releases depName=shelken/CLIProxyAPI
+  default = "v6.9.30"
 }
 
 variable "SOURCE" {
@@ -19,7 +20,8 @@ group "default" {
 target "image" {
   inherits = ["docker-metadata-action"]
   args = {
-    VERSION = "${VERSION}"
+    VERSION     = "${VERSION}"
+    SOURCE_REPO = "${SOURCE}.git"
   }
   labels = {
     "org.opencontainers.image.source" = "${SOURCE}"
