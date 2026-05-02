@@ -6,7 +6,7 @@ variable "APP" {
 
 variable "VERSION" {
   // renovate: datasource=github-releases depName=shelken/CLIProxyAPI
-  default = "v6.9.30"
+  default = "v6.10.0"
 }
 
 variable "SOURCE" {
