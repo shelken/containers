@@ -1,0 +1,30 @@
+{
+  "name": "simple-hello-world",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "typecheck": "tsc -b --noEmit",
+    "docker:build": "docker build -t ${npm_package_name}:local .",
+    "docker:run": "docker run --rm -p 18080:8080 ${npm_package_name}:local",
+    "docker:smoke": "npm run docker:build && sh -c 'docker rm -f ${npm_package_name}-test >/dev/null 2>&1 || true; docker run --rm -d --name ${npm_package_name}-test -p 18080:8080 ${npm_package_name}:local; trap \"docker rm -f ${npm_package_name}-test >/dev/null 2>&1 || true\" EXIT; for i in 1 2 3 4 5 6 7 8 9 10; do curl -fsS http://127.0.0.1:18080/healthz && break; sleep 0.5; done; curl -fsS http://127.0.0.1:18080/not-a-real-route | grep -q \"<div id=\\\"root\\\"></div>\"'"
+  },
+  "dependencies": {
+    "@gsap/react": "^2.1.2",
+    "gsap": "^3.15.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.0",
+    "@types/react": "^19.2.15",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "tailwindcss": "^4.3.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.14"
+  }
+}
