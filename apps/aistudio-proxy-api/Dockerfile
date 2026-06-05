@@ -92,10 +92,8 @@ RUN mkdir -p \
       /app/auth_profiles/emergency \
       /app/logs \
       /app/.cache \
-      /home/app/.cache/ms-playwright \
       /home/app/.mozilla \
     && camoufox fetch \
-    && python -m playwright install firefox \
     && python scripts/update_browserforge_data.py \
     && chown -R app:app /app /home/app /opt/venv
 
