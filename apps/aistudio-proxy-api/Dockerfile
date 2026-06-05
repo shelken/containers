@@ -24,6 +24,71 @@ RUN git clone --depth=1 --branch "$VERSION" "$SOURCE_REPO" .
 
 RUN poetry install --only main --no-root --no-ansi
 
+FROM builder AS browser-assets
+
+ENV HOME=/tmp/camoufox-home
+
+RUN mkdir -p "$HOME"
+
+RUN camoufox fetch
+
+# 变更原因：AIstudioProxyAPI 在 Linux 容器内固定使用 Linux Camoufox 指纹，最终镜像不需要 macOS/Windows 字体。
+RUN rm -rf \
+      "$HOME/.cache/camoufox/fonts/macos" \
+      "$HOME/.cache/camoufox/fonts/windows"
+
+FROM builder AS app-assets
+
+WORKDIR /src
+
+RUN python scripts/update_browserforge_data.py
+
+# 变更原因：生产 headless 服务只需要 API、浏览器控制和流式代理代码，不需要仓库元数据、文档、测试、GUI 和前端源码。
+RUN rm -rf \
+      .git \
+      .github \
+      docker \
+      docs \
+      tests \
+      gui \
+      scripts \
+      static \
+      .dockerignore \
+      .env.example \
+      .gitattributes \
+      .gitignore \
+      CONTRIBUTING.md \
+      LICENSE \
+      README.md \
+      monkeytype_config.py \
+      pyrightconfig.json \
+      simple_launcher.py \
+      simple_start.sh \
+      supervisord.conf \
+      支持作者.jpg \
+      poetry.lock \
+      pyproject.toml
+
+# 变更原因：GUI 和本地开发工具已删除，相关 Python 包不会被生产 API 路径导入。
+RUN rm -rf \
+      /opt/venv/lib/python3.10/site-packages/customtkinter \
+      /opt/venv/lib/python3.10/site-packages/customtkinter-*dist-info \
+      /opt/venv/lib/python3.10/site-packages/PIL \
+      /opt/venv/lib/python3.10/site-packages/pillow.libs \
+      /opt/venv/lib/python3.10/site-packages/pillow-*dist-info \
+      /opt/venv/lib/python3.10/site-packages/flask \
+      /opt/venv/lib/python3.10/site-packages/flask-*dist-info \
+      /opt/venv/lib/python3.10/site-packages/werkzeug \
+      /opt/venv/lib/python3.10/site-packages/werkzeug-*dist-info \
+      /opt/venv/lib/python3.10/site-packages/jinja2 \
+      /opt/venv/lib/python3.10/site-packages/jinja2-*dist-info \
+      /opt/venv/lib/python3.10/site-packages/itsdangerous \
+      /opt/venv/lib/python3.10/site-packages/itsdangerous-*dist-info
+
+# 变更原因：runtime 不执行安装与测试，删除 Python 缓存和测试目录可减少最终复制内容。
+RUN find /opt/venv -type d \( -name '__pycache__' -o -name 'tests' -o -name 'test' \) -prune -exec rm -rf '{}' + \
+    && find /opt/venv -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
+
 FROM python:3.10-slim-bookworm
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -83,8 +148,9 @@ RUN groupadd --gid 1000 app \
 
 WORKDIR /app
 
-COPY --from=builder /opt/venv /opt/venv
-COPY --from=builder /src /app
+COPY --from=app-assets /opt/venv /opt/venv
+COPY --from=app-assets /src /app
+COPY --from=browser-assets /tmp/camoufox-home/.cache/camoufox /home/app/.cache/camoufox
 
 RUN mkdir -p \
       /app/auth_profiles/active \
@@ -93,8 +159,6 @@ RUN mkdir -p \
       /app/logs \
       /app/.cache \
       /home/app/.mozilla \
-    && camoufox fetch \
-    && python scripts/update_browserforge_data.py \
     && chown -R app:app /app /home/app /opt/venv
 
 USER 1000:1000
