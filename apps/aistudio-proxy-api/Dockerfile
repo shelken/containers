@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM python:3.10-slim-bookworm AS builder
+FROM python:3.14-slim-bookworm AS builder
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG VERSION=v4.1.2_py
@@ -89,7 +89,7 @@ RUN rm -rf \
 RUN find /opt/venv -type d \( -name '__pycache__' -o -name 'tests' -o -name 'test' \) -prune -exec rm -rf '{}' + \
     && find /opt/venv -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
 
-FROM python:3.10-slim-bookworm
+FROM python:3.14-slim-bookworm
 
 ARG DEBIAN_FRONTEND=noninteractive
 
