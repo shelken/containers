@@ -315,7 +315,7 @@ func (c *Client) getDeviceStatus() (*DeviceData, error) {
 
 	// 信号状态
 	data.SignalBar = int(parseIntFromJSON(result["signalbar"]))
-	data.NetworkType = parseStringFromJSON(result["network_type"])
+	data.NetworkType = translateNetworkType(parseStringFromJSON(result["network_type"]))
 	data.Provider = parseStringFromJSON(result["network_provider"])
 	data.PPPStatus = parseStringFromJSON(result["ppp_status"])
 	data.RSRP5G = int(parseIntFromJSON(result["Z5g_rsrp"]))
@@ -362,6 +362,19 @@ func encryptPasswordWithLD(password, ld string) string {
 	// 第二次 SHA256: sha256(hex1 + ld)
 	hash2 := sha256.Sum256([]byte(hex1 + ld))
 	return strings.ToUpper(fmt.Sprintf("%x", hash2))
+}
+
+// translateNetworkType 将 ZTE API 返回的原始 network_type 值转成人可读的网络制式
+func translateNetworkType(networkType string) string {
+	t := strings.ToUpper(networkType)
+	switch {
+	case strings.Contains(t, "5G"), strings.Contains(t, "NR"), strings.Contains(t, "SA"), t == "20", t == "26":
+		return "5G"
+	case strings.Contains(t, "4G"), strings.Contains(t, "LTE"), t == "13":
+		return "4G"
+	default:
+		return networkType
+	}
 }
 
 // parseIntFromJSON 从 JSON 值中解析整数 (可能是 string 或 float64)
