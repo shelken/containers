@@ -55,6 +55,20 @@ func (h *Handlers) MetricsHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "# TYPE zte_mifi_monthly_bytes_total gauge\n")
 	fmt.Fprintf(w, "zte_mifi_monthly_bytes_total{%s} %d\n", labels, data.MonthlyTxBytes+data.MonthlyRxBytes)
 
+	// 月流量配额上限
+	fmt.Fprintf(w, "# HELP zte_mifi_monthly_quota_bytes Monthly traffic quota limit in bytes (0 if device has no limit set)\n")
+	fmt.Fprintf(w, "# TYPE zte_mifi_monthly_quota_bytes gauge\n")
+	fmt.Fprintf(w, "zte_mifi_monthly_quota_bytes{%s} %d\n", labels, data.MonthlyQuotaBytes)
+
+	// 月流量剩余
+	fmt.Fprintf(w, "# HELP zte_mifi_monthly_remaining_bytes Monthly remaining bytes before quota exhausted\n")
+	fmt.Fprintf(w, "# TYPE zte_mifi_monthly_remaining_bytes gauge\n")
+	remaining := data.MonthlyQuotaBytes - (data.MonthlyTxBytes + data.MonthlyRxBytes)
+	if remaining < 0 {
+		remaining = 0
+	}
+	fmt.Fprintf(w, "zte_mifi_monthly_remaining_bytes{%s} %d\n", labels, remaining)
+
 	// 月度在线时长
 	fmt.Fprintf(w, "# HELP zte_mifi_monthly_time_seconds Monthly online time in seconds\n")
 	fmt.Fprintf(w, "# TYPE zte_mifi_monthly_time_seconds gauge\n")

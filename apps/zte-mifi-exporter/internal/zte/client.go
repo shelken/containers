@@ -61,10 +61,11 @@ type DeviceData struct {
 	FirmwareVersion string // 固件版本
 
 	// 流量统计
-	MonthlyTxBytes int64
-	MonthlyRxBytes int64
-	MonthlyTime    int64 // 月在线时长(秒)
-	DateMonth      int
+	MonthlyTxBytes     int64
+	MonthlyRxBytes     int64
+	MonthlyTime        int64 // 月在线时长(秒)
+	MonthlyQuotaBytes  int64 // 月流量配额上限(字节)，设备未设置时为 0
+	DateMonth          int
 
 	// 实时速率
 	RealtimeTxThrpt int64 // 实时上传速率 (bytes/s)
@@ -264,7 +265,7 @@ func (c *Client) getDeviceStatus() (*DeviceData, error) {
 		"sim_msisdn,data_volume_limit_switch,battery_value,battery_vol_percent,network_signalbar," +
 		"network_rssi,cr_version,iccid,imei,imsi,ipv6_wan_ipaddr,lan_ipaddr,mac_address,msisdn," +
 		"network_information,Lte_ca_status,rssi,Z5g_rsrp,lte_rsrp,wifi_access_sta_num,loginfo," +
-		"data_volume_alert_percent,data_volume_limit_size,realtime_rx_thrpt,realtime_tx_thrpt," +
+		"data_volume_alert_percent,data_volume_limit_size,data_volume_limit_unit,realtime_rx_thrpt,realtime_tx_thrpt," +
 		"realtime_time,monthly_tx_bytes,monthly_rx_bytes,monthly_time,network_type,network_provider," +
 		"ppp_status,signalbar,wifi_onoff_state,date_month"
 
@@ -308,6 +309,7 @@ func (c *Client) getDeviceStatus() (*DeviceData, error) {
 	data.MonthlyRxBytes = parseIntFromJSON(result["monthly_rx_bytes"])
 	data.MonthlyTime = parseIntFromJSON(result["monthly_time"])
 	data.DateMonth = int(parseIntFromJSON(result["date_month"]))
+	data.MonthlyQuotaBytes = parseQuotaBytes(result["data_volume_limit_switch"], result["data_volume_limit_size"], result["data_volume_limit_unit"])
 
 	// 实时速率
 	data.RealtimeTxThrpt = parseIntFromJSON(result["realtime_tx_thrpt"])
@@ -375,6 +377,25 @@ func translateNetworkType(networkType string) string {
 	default:
 		return networkType
 	}
+}
+
+// parseQuotaBytes 解析月流量配额上限(字节)，与 f50-cli.sh quota_bytes 逻辑对齐。
+// 当 switch=1 且 unit="data" 时，size 形如 "470_1024"，表示 470 * 1024 MiB。
+func parseQuotaBytes(switchVal, sizeVal, unitVal interface{}) int64 {
+	sw := parseStringFromJSON(switchVal)
+	unit := parseStringFromJSON(unitVal)
+	size := parseStringFromJSON(sizeVal)
+	if sw == "1" && unit == "data" {
+		idx := strings.Index(size, "_")
+		if idx > 0 {
+			a, err1 := strconv.ParseInt(size[:idx], 10, 64)
+			b, err2 := strconv.ParseInt(size[idx+1:], 10, 64)
+			if err1 == nil && err2 == nil && a > 0 && b > 0 {
+				return a * b * 1024 * 1024
+			}
+		}
+	}
+	return 0
 }
 
 // parseIntFromJSON 从 JSON 值中解析整数 (可能是 string 或 float64)
