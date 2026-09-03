@@ -15,7 +15,7 @@ RUN go mod download
 
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w -X 'main.Version=${VERSION}' -X 'main.Commit=${COMMIT}' -X 'main.BuildDate=${BUILD_DATE}'" -o ./CLIProxyAPI ./cmd/server/
 
-FROM alpine:3.23.4
+FROM alpine:3.24.1
 
 RUN apk add --no-cache tzdata
 
