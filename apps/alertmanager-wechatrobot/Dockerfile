@@ -14,8 +14,8 @@ FROM alpine:latest
 
 WORKDIR /app
 
-# Install tzdata for timezone support
-RUN apk add --no-cache tzdata
+# Install ca-certificates for HTTPS and tzdata for timezone support
+RUN apk add --no-cache ca-certificates tzdata
 
 COPY --from=builder /app/alertmanager-wechatrobot .
 
