@@ -5,7 +5,7 @@ variable "APP" {
 }
 
 variable "VERSION" {
-  default = "v1.8.0"
+  default = "1.8.1"
 }
 
 variable "SOURCE" {
