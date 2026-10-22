@@ -5,12 +5,12 @@ variable "APP" {
 }
 
 variable "VERSION" {
-  default = "0.6.0"
+  default = "0.6.1"
 }
 
 variable "GO_VERSION" {
   // renovate: datasource=docker depName=golang
-  default = "1.26.4"
+  default = "1.27.3"
 }
 
 group "default" {
