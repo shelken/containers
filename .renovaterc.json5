@@ -4,14 +4,16 @@
     "config:recommended",
     "docker:enableMajor",
     "helpers:pinGitHubActionDigests",
+    "group:allNonMajor",
     "github>shelken/containers//.renovate/autoMerge.json5",
     "github>shelken/containers//.renovate/labels.json5",
     "github>shelken/containers//.renovate/semanticCommits.json5",
     ":automergeBranch",
     ":dependencyDashboard",
-    ":disableRateLimiting",
     ":timezone(Asia/Shanghai)",
   ],
+  prConcurrentLimit: 1,
+  rebaseWhen: "conflicted",
   customManagers: [
     {
       customType: "regex",
@@ -32,6 +34,16 @@
       ],
       datasourceTemplate: "{{#if datasource}}{{{datasource}}}{{else}}github-releases{{/if}}",
       versioningTemplate: "{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}",
+    },
+  ],
+  bumpVersions: [
+    {
+      description: "Auto-bump patch version for self-maintained apps when dependencies update",
+      filePatterns: ["/(^|/)docker-bake\\.hcl$/"],
+      matchStrings: [
+        'variable "VERSION"\\s*\\{\\s*\\n\\s*default\\s*=\\s*"(?<version>[^"]+)"',
+      ],
+      bumpType: "patch",
     },
   ],
   dependencyDashboardTitle: "Renovate Dashboard 🤖",

@@ -1,0 +1,89 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+name: Pull Request
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - apps/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-latest
+    outputs:
+      changed-files: ${{ steps.changed-files.outputs.changed_files }}
+    steps:
+      - name: Get Changed Files
+        uses: bjw-s-labs/action-changed-files@a9a36fb08ce06db9b02fbd8026cc2c0945eb9841 # v0.6.0
+        id: changed-files
+        with:
+          path: apps
+          include_only_directories: true
+          max_depth: 1
+
+  changed:
+    if: ${{ needs.prepare.outputs.changed-files != '[]' }}
+    name: Get Changed Apps
+    needs:
+      - prepare
+    runs-on: ubuntu-latest
+    outputs:
+      apps: ${{ steps.apps.outputs.apps }}
+    steps:
+      - name: Get Apps
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        id: apps
+        env:
+          APPS: ${{ join(fromJSON(needs.prepare.outputs.changed-files), ' ') }}
+        with:
+          script: |-
+            const { APPS } = process.env;
+            const appsToBuild = APPS.split(' ').filter(Boolean);
+            core.setOutput('apps', JSON.stringify(appsToBuild));
+            console.log('apps:', JSON.stringify(appsToBuild, null, 2));
+            core.summary.addHeading('Apps to test:').addList(appsToBuild).write();
+
+  build:
+    if: ${{ needs.changed.outputs.apps != '[]' }}
+    name: Build ${{ matrix.app }}
+    needs:
+      - changed
+    uses: ./.github/workflows/app-builder.yaml
+    permissions:
+      contents: read
+    secrets: inherit
+    strategy:
+      matrix:
+        app: ${{ fromJSON(needs.changed.outputs.apps) }}
+      fail-fast: false
+      max-parallel: 4
+    with:
+      app: ${{ matrix.app }}
+      release: false
+
+  status:
+    if: ${{ !cancelled() }}
+    name: Build Success
+    needs:
+      - build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Any jobs failed?
+        if: ${{ contains(needs.*.result, 'failure') }}
+        run: |-
+          exit 1
+
+      - name: All jobs passed or skipped?
+        if: ${{ !(contains(needs.*.result, 'failure')) }}
+        run: |-
+          echo "All jobs passed or skipped" && echo "${{ toJSON(needs.*.result) }}"
