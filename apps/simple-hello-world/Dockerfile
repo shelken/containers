@@ -1,13 +1,13 @@
-# syntax=docker/dockerfile:1.24
+# syntax=docker/dockerfile:1.28
 
-FROM node:24-alpine AS builder
+FROM oven/bun:1-alpine AS builder
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm ci
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
 
 COPY . .
-RUN npm run build
+RUN bun run build
 
 FROM nginxinc/nginx-unprivileged:1.31-alpine
 
