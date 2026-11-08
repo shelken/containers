@@ -5,8 +5,8 @@ variable "APP" {
 }
 
 variable "VERSION" {
-  // renovate: datasource=github-releases depName=caddyserver/caddy
-  default = "v2.11.7"
+  // renovate: datasource=docker depName=caddy
+  default = "2.11.7"
 }
 
 variable "SOURCE" {
@@ -21,8 +21,6 @@ target "image" {
   inherits = ["docker-metadata-action"]
   args = {
     VERSION = "${VERSION}"
-    // 上游镜像标签不带 v 前缀
-    CADDY_VERSION = trimprefix("${VERSION}", "v")
   }
   labels = {
     "org.opencontainers.image.source" = "${SOURCE}"

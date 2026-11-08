@@ -11,3 +11,8 @@
 ## 不做什么
 
 - 过于复杂的服务不该在这个仓库
+
+## 版本约定
+
+- 基础镜像版本来自 `docker-bake.hcl` 的变量，注解用 `datasource=docker`，值与 Docker 标签一致（不带 `v`）
+- Dockerfile 只通过 `ARG` 接收 bake 传入的版本，不依赖 `DOCKER_META_VERSION`：PR 构建时它是 `sandbox`
