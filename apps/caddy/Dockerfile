@@ -1,7 +1,7 @@
 # Build stage
-ARG DOCKER_META_VERSION
+ARG VERSION
 
-FROM caddy:${DOCKER_META_VERSION}-builder AS builder
+FROM caddy:${VERSION}-builder AS builder
 
 RUN xcaddy build \
   --with github.com/caddy-dns/cloudflare \
@@ -13,7 +13,7 @@ RUN xcaddy build \
 #    --with github.com/WeidiDeng/caddy-cloudflare-ip
 
 # Final stage
-FROM caddy:${DOCKER_META_VERSION}
+FROM caddy:${VERSION}
 
 # Copy the custom-built Caddy binary
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy
