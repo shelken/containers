@@ -1,2 +1,0 @@
-🎯 DIRECT,[]GEOIP,CN
-🐟 Other,[]FINAL

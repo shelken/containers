@@ -72,19 +72,6 @@
       ],
     },
     {
-      description: "Bump subconverter patch version when its own dependencies update",
-      matchFileNames: ["apps/subconverter/**"],
-      bumpVersions: [
-        {
-          filePatterns: ["apps/subconverter/docker-bake.hcl"],
-          matchStrings: [
-            'variable "VERSION"\\s*\\{\\s*\\n\\s*default\\s*=\\s*"(?<version>[^"]+)"',
-          ],
-          bumpType: "patch",
-        },
-      ],
-    },
-    {
       description: "Bump zte-mifi-exporter patch version when its own dependencies update",
       matchFileNames: ["apps/zte-mifi-exporter/**"],
       bumpVersions: [
