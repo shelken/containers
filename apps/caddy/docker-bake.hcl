@@ -21,6 +21,8 @@ target "image" {
   inherits = ["docker-metadata-action"]
   args = {
     VERSION = "${VERSION}"
+    // 上游镜像标签不带 v 前缀
+    CADDY_VERSION = trimprefix("${VERSION}", "v")
   }
   labels = {
     "org.opencontainers.image.source" = "${SOURCE}"
