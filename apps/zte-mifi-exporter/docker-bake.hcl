@@ -5,7 +5,7 @@ variable "APP" {
 }
 
 variable "VERSION" {
-  default = "0.6.2"
+  default = "0.6.3"
 }
 
 variable "GO_VERSION" {
