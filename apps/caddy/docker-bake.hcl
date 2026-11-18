@@ -6,7 +6,7 @@ variable "APP" {
 
 variable "VERSION" {
   // renovate: datasource=docker depName=caddy
-  default = "2.11.7"
+  default = "2.11.9"
 }
 
 variable "SOURCE" {
