@@ -16,3 +16,4 @@
 
 - 基础镜像版本来自 `docker-bake.hcl` 的变量，注解用 `datasource=docker`，值与 Docker 标签一致（不带 `v`）
 - Dockerfile 只通过 `ARG` 接收 bake 传入的版本，不依赖 `DOCKER_META_VERSION`：PR 构建时它是 `sandbox`
+- Dockerfile 里写死的镜像引用（`FROM`、`# syntax=`）写到 patch 版本并钉 digest（`镜像:1.2.3-alpine@sha256:...`），禁止 `latest` 与 `1-alpine` 这类浮动 tag：浮动 tag 的补丁更新不会生成写明版本号的 Renovate PR，构建出的镜像也看不出基底版本；经 bake 变量传入的版本同样写到 patch
